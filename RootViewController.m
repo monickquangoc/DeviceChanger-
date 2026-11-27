@@ -1,4 +1,5 @@
 #import "RootViewController.h"
+#import <spawn.h>
 
 @implementation RootViewController {
     UISwitch *_enableSwitch;
