@@ -4,32 +4,46 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Theos (Tự động tải Toolchain)
-        uses: Randomblock1/theos-action@v1
-        with:
-          theos-src: https://github.com/theos/theos.git
-          
-      - name: Install SDK, ldid & Build
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make git curl xz-utils fakeroot dpkg
+        
+      - name: Install Theos & Toolchain
         run: |
           export THEOS=$HOME/theos
-          sudo apt-get update
-          sudo apt-get install -y curl xz-utils fakeroot dpkg
+          # Clone Theos
+          git clone --recursive https://github.com/theos/theos.git $THEOS
           
-          # Tải trực tiếp ldid
+          # Tải Toolchain (Bộ biên dịch clang)
+          curl -L -O https://github.com/theos/toolchain/releases/download/linux-x64/toolchain_linux_x64.tar.xz
+          tar -xJf toolchain_linux_x64.tar.xz -C $HOME
+          
+          # Lưu biến môi trường cho các bước sau
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+          echo "$HOME/toolchain/linux/iphone/bin" >> $GITHUB_PATH
+          
+          # Tải ldid (Trình ký app)
           curl -L -o ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64
           chmod +x ldid
           sudo mv ldid /usr/local/bin/
           
-          # Xóa thư mục rỗng và tải SDK thật
+      - name: Download SDK
+        run: |
+          export THEOS=$HOME/theos
           rm -rf $THEOS/sdks
+          # Tải SDK iOS
           git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks
           
+      - name: Build Package
+        run: |
+          export THEOS=$HOME/theos
           # Fix lỗi Git
           git config --global --add safe.directory '*'
-          
-          # Build ra file Deb
+          # Bắt đầu build
           make clean || true
           make package FINALPACKAGE=1
           
