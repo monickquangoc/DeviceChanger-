@@ -1,0 +1,9 @@
+Package: com.outcome.devicechangerpro
+Name: DeviceChanger Pro
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: 1-Click Device Spoofer, Location Faker & JB Bypass
+Maintainer: outcome
+Author: outcome
+Section: Tweaks
+Depends: mobilesubstrate, firmware (>= 15.0)
