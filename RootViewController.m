@@ -1,5 +1,5 @@
 #import "RootViewController.h"
-#import <spawn.h>
+#import <CoreFoundation/CoreFoundation.h>
 
 @implementation RootViewController {
     UISwitch *_enableSwitch;
@@ -34,9 +34,8 @@
 
 - (void)respring {
     [_currentConfig writeToFile:_plistPath atomically:YES];
-    pid_t pid;
-    const char *args[] = {"killall", "-9", "SpringBoard", NULL};
-    posix_spawn(&pid, "/usr/bin/killall", NULL, NULL, (char * const *)args, NULL);
+    // Gửi tín hiệu cho Tweak trong SpringBoard để nó tự khởi động lại
+    CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), CFSTR("com.outcome.devicechanger.respring"), NULL, NULL, YES);
 }
 
 - (void)randomizeAction {
@@ -48,7 +47,6 @@
     NSArray *versions = @[@"16.7.1", @"17.2.1", @"17.5.1"];
     
     int idx = arc4random_uniform((uint32_t)models.count);
-    
     double randomLat = 8.18 + ((double)arc4random() / UINT32_MAX) * (23.39 - 8.18);
     double randomLon = 102.14 + ((double)arc4random() / UINT32_MAX) * (109.46 - 102.14);
     
@@ -66,35 +64,45 @@
 - (void)clearShopeeCache {
     NSString *containersPath = @"/var/mobile/Containers/Data/Application/";
     NSArray *folders = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:containersPath error:nil];
+    BOOL found = NO;
+    
     for (NSString *folder in folders) {
         NSString *path = [containersPath stringByAppendingPathComponent:folder];
-        NSString *plistPath = [path stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
-        NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:plistPath];
-        if ([meta[@"MCMMetadataIdentifier"] containsString:@"com.bee.ios"] || [meta[@"MCMMetadataIdentifier"] containsString:@"com.shopee.vn"]) {
-            NSString *cachePath = [path stringByAppendingPathComponent:@"Library/Caches"];
-            NSString *prefsPath = [path stringByAppendingPathComponent:@"Library/Preferences"];
-            [[NSFileManager defaultManager] removeItemAtPath:cachePath error:nil];
-            [[NSFileManager defaultManager] removeItemAtPath:prefsPath error:nil];
-            break;
+        NSString *metaPlist = [path stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+        
+        if ([[NSFileManager defaultManager] fileExistsAtPath:metaPlist]) {
+            NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPlist];
+            NSString *bundleId = meta[@"MCMMetadataIdentifier"];
+            
+            if ([bundleId isEqualToString:@"com.bee.ios"] || [bundleId isEqualToString:@"com.shopee.vn"]) {
+                NSString *cachePath = [path stringByAppendingPathComponent:@"Library/Caches"];
+                NSString *prefsPath = [path stringByAppendingPathComponent:@"Library/Preferences"];
+                
+                [[NSFileManager defaultManager] removeItemAtPath:cachePath error:nil];
+                [[NSFileManager defaultManager] removeItemAtPath:prefsPath error:nil];
+                found = YES;
+                break;
+            }
         }
     }
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Shopee Cache" message:(found ? @"Đã xóa sạch dữ liệu!" : @"Không tìm thấy app Shopee!") preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Table View
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 3; }
-
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 1;
     if (section == 1) return 3;
     return 2;
 }
-
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Trạng thái";
     if (section == 1) return @"Hành động";
     return @"Dữ liệu Fake";
 }
-
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
     cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
@@ -117,11 +125,7 @@
     }
     return cell;
 }
-
-- (void)switchChanged:(UISwitch *)sender {
-    _currentConfig[@"Enabled"] = @(sender.isOn);
-}
-
+- (void)switchChanged:(UISwitch *)sender { _currentConfig[@"Enabled"] = @(sender.isOn); }
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     if (indexPath.section == 1) {
