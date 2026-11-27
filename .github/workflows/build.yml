@@ -10,7 +10,12 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make git curl fakeroot dpkg ldid
+          sudo apt-get install -y make git curl fakeroot dpkg
+          
+          # Tải trực tiếp ldid bản Linux, bỏ qua kho của Ubuntu
+          curl -L -o ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64
+          chmod +x ldid
+          sudo mv ldid /usr/local/bin/
 
       - name: Setup Theos
         run: |
