@@ -1,0 +1,25 @@
+name: Build DeviceChanger Deb
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Theos
+        uses: Randomblock1/theos-action@v1
+        with:
+          theos-src: https://github.com/theos/theos.git
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make git curl
+      - name: Build Package
+        run: |
+          export THEOS=$HOME/theos
+          make clean
+          make package FINALPACKAGE=1
+      - name: Upload Deb
+        uses: actions/upload-artifact@v3
+        with:
+          name: DeviceChanger-Deb
+          path: ./packages/*.deb
