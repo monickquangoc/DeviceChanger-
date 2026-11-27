@@ -1,5 +1,6 @@
 #import "RootViewController.h"
 #import <CoreFoundation/CoreFoundation.h>
+#import <spawn.h>
 
 @implementation RootViewController {
     UISwitch *_enableSwitch;
@@ -26,6 +27,7 @@
             @"version": @"17.5.1",
             @"idfv": @"A1B2C3D4-E5F6-7A8B-9C0D-1E2F3A4B5C6D",
             @"idfa": @"E5F6G7H8-A1B2-C3D4-E5F6-7A8B9C0D1E2F",
+            @"serial": @"F2LZK1QJQ6L5",
             @"lat": @21.0285,
             @"lon": @105.8542
         } mutableCopy];
@@ -34,13 +36,23 @@
 
 - (void)respring {
     [_currentConfig writeToFile:_plistPath atomically:YES];
-    // Gửi tín hiệu cho Tweak trong SpringBoard để nó tự khởi động lại
     CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), CFSTR("com.outcome.devicechanger.respring"), NULL, NULL, YES);
+}
+
+// Hàm sinh Serial ngẫu nhiên (12 ký tự)
+- (NSString *)generateRandomSerial {
+    NSString *letters = @"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    NSMutableString *randomString = [NSMutableString stringWithCapacity:12];
+    for (int i = 0; i < 12; i++) {
+        [randomString appendFormat:@"%C", [letters characterAtIndex:arc4random_uniform((uint32_t)[letters length])]];
+    }
+    return randomString;
 }
 
 - (void)randomizeAction {
     NSString *newUUID1 = [[NSUUID UUID] UUIDString];
     NSString *newUUID2 = [[NSUUID UUID] UUIDString];
+    NSString *newSerial = [self generateRandomSerial];
     
     NSArray *models = @[@"iPhone15,4", @"iPhone15,5", @"iPhone16,1", @"iPhone16,2"];
     NSArray *names = @[@"iPhone 14", @"iPhone 14 Pro", @"iPhone 15 Pro", @"iPhone 15 Pro Max"];
@@ -52,6 +64,7 @@
     
     _currentConfig[@"idfv"] = newUUID1;
     _currentConfig[@"idfa"] = newUUID2;
+    _currentConfig[@"serial"] = newSerial;
     _currentConfig[@"model"] = models[idx];
     _currentConfig[@"name"] = names[idx];
     _currentConfig[@"version"] = versions[arc4random_uniform((uint32_t)versions.count)];
@@ -62,31 +75,20 @@
 }
 
 - (void)clearShopeeCache {
-    NSString *containersPath = @"/var/mobile/Containers/Data/Application/";
-    NSArray *folders = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:containersPath error:nil];
-    BOOL found = NO;
+    NSString *script = @"for dir in /var/mobile/Containers/Data/Application/*/; do\n"
+                        "if grep -q -E 'com.bee.ios|com.shopee.vn' \"$dir/.com.apple.mobile_container_manager.metadata.plist\" 2>/dev/null; then\n"
+                        "rm -rf \"$dir/Library/Caches/\"*\n"
+                        "rm -rf \"$dir/Library/Preferences/\"*\n"
+                        "fi\ndone\n";
+                        
+    NSString *scriptPath = @"/var/mobile/Library/Preferences/clear_shopee.sh";
+    [script writeToFile:scriptPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     
-    for (NSString *folder in folders) {
-        NSString *path = [containersPath stringByAppendingPathComponent:folder];
-        NSString *metaPlist = [path stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
-        
-        if ([[NSFileManager defaultManager] fileExistsAtPath:metaPlist]) {
-            NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPlist];
-            NSString *bundleId = meta[@"MCMMetadataIdentifier"];
-            
-            if ([bundleId isEqualToString:@"com.bee.ios"] || [bundleId isEqualToString:@"com.shopee.vn"]) {
-                NSString *cachePath = [path stringByAppendingPathComponent:@"Library/Caches"];
-                NSString *prefsPath = [path stringByAppendingPathComponent:@"Library/Preferences"];
-                
-                [[NSFileManager defaultManager] removeItemAtPath:cachePath error:nil];
-                [[NSFileManager defaultManager] removeItemAtPath:prefsPath error:nil];
-                found = YES;
-                break;
-            }
-        }
-    }
+    pid_t pid;
+    const char *args[] = {"/var/jb/usr/bin/sh", [scriptPath UTF8String], NULL};
+    posix_spawn(&pid, "/var/jb/usr/bin/sh", NULL, NULL, (char * const *)args, NULL);
     
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Shopee Cache" message:(found ? @"Đã xóa sạch dữ liệu!" : @"Không tìm thấy app Shopee!") preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Shopee Cache" message:@"Đã xóa sạch dữ liệu Shopee (Chạy ngầm)!" preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
@@ -121,7 +123,7 @@
     }
     else {
         if (indexPath.row == 0) { cell.textLabel.text = @"Thiết bị:"; cell.detailTextLabel.text = _currentConfig[@"name"]; }
-        if (indexPath.row == 1) { cell.textLabel.text = @"Tọa độ:"; cell.detailTextLabel.text = [NSString stringWithFormat:@"%@, %@", _currentConfig[@"lat"], _currentConfig[@"lon"]]; }
+        if (indexPath.row == 1) { cell.textLabel.text = @"Serial:"; cell.detailTextLabel.text = _currentConfig[@"serial"]; }
     }
     return cell;
 }
