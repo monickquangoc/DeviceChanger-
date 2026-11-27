@@ -7,8 +7,8 @@
         <key>Bundles</key>
         <array>
             <string>com.apple.springboard</string>
-            <string>com.apple.UIKit</string>
             <string>com.apple.Preferences</string>
+            <string>com.apple.WebKit.WebContent</string>
             <string>com.bee.ios</string>
             <string>com.shopee.vn</string>
         </array>
