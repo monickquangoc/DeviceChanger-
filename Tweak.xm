@@ -1,17 +1,14 @@
 #import <UIKit/UIKit.h>
 #import <CoreLocation/CoreLocation.h>
 #import <AdSupport/AdSupport.h>
+#import <substrate.h>
 
-// Thêm extern "C" để sửa lỗi Undefined symbols (Name Mangling)
-extern "C" CFTypeRef MGCopyAnswer(CFStringRef property);
+// Dùng con trỏ hàm để gọi MGCopyAnswer mà không cần link thư viện
+typedef CFTypeRef (*MGCopyAnswerFunc)(CFStringRef);
+static MGCopyAnswerFunc orig_MGCopyAnswer = NULL;
 
-static NSDictionary *getConfig() {
-    return [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
-}
-
-// 1. Hook MobileGestalt (Để Settings -> About thay đổi)
-%hookf(CFTypeRef, MGCopyAnswer, CFStringRef prop) {
-    NSDictionary *cfg = getConfig();
+static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"]) {
         if (CFEqual(prop, CFSTR("ProductType"))) {
             return (__bridge_retained CFTypeRef)cfg[@"model"];
@@ -20,46 +17,47 @@ static NSDictionary *getConfig() {
             return (__bridge_retained CFTypeRef)cfg[@"name"];
         }
     }
-    return %orig;
+    if (orig_MGCopyAnswer) return orig_MGCopyAnswer(prop);
+    return NULL;
 }
 
-// 2. Hook UIDevice (Cho các app khác đọc)
+// 1. Hook UIDevice (Cho các app khác đọc)
 %hook UIDevice
 - (NSString *)name {
-    NSDictionary *cfg = getConfig();
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"] && cfg[@"name"]) return cfg[@"name"];
     return %orig;
 }
 - (NSString *)model {
-    NSDictionary *cfg = getConfig();
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"] && cfg[@"model"]) return cfg[@"model"];
     return %orig;
 }
 - (NSString *)systemVersion {
-    NSDictionary *cfg = getConfig();
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"] && cfg[@"version"]) return cfg[@"version"];
     return %orig;
 }
 - (NSUUID *)identifierForVendor {
-    NSDictionary *cfg = getConfig();
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"] && cfg[@"idfv"]) return [[NSUUID alloc] initWithUUIDString:cfg[@"idfv"]];
     return %orig;
 }
 %end
 
-// 3. Hook IDFA
+// 2. Hook IDFA
 %hook ASIdentifierManager
 - (NSUUID *)advertisingIdentifier {
-    NSDictionary *cfg = getConfig();
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"] && cfg[@"idfa"]) return [[NSUUID alloc] initWithUUIDString:cfg[@"idfa"]];
     return %orig;
 }
 %end
 
-// 4. Hook Định vị (Fake Location)
+// 3. Hook Định vị
 %hook CLLocationManager
 - (CLLocation *)location {
-    NSDictionary *cfg = getConfig();
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"] && cfg[@"lat"] && cfg[@"lon"]) {
         return [[CLLocation alloc] initWithLatitude:[cfg[@"lat"] doubleValue] longitude:[cfg[@"lon"] doubleValue]];
     }
@@ -67,7 +65,7 @@ static NSDictionary *getConfig() {
 }
 - (void)startUpdatingLocation {
     %orig;
-    NSDictionary *cfg = getConfig();
+    NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
     if (cfg[@"Enabled"] && cfg[@"lat"] && cfg[@"lon"]) {
         CLLocation *fakeLoc = [[CLLocation alloc] initWithLatitude:[cfg[@"lat"] doubleValue] longitude:[cfg[@"lon"] doubleValue]];
         if (self.delegate && [self.delegate respondsToSelector:@selector(locationManager:didUpdateLocations:)]) {
@@ -77,7 +75,7 @@ static NSDictionary *getConfig() {
 }
 %end
 
-// 5. Bypass Jailbreak
+// 4. Bypass Jailbreak
 %hook NSFileManager
 - (BOOL)fileExistsAtPath:(NSString *)path {
     NSArray *jbPaths = @[@"/Applications/Cydia.app", @"/var/jb", @"/usr/sbin/sshd", @"/.installed_dopamine", @"/private/var/lib/dpkg"];
@@ -88,11 +86,14 @@ static NSDictionary *getConfig() {
 }
 %end
 
-// 6. Lắng nghe tín hiệu từ App để tự Respring (Vì App không có quyền killall)
+// 5. Lắng nghe tín hiệu từ App để tự Respring
 static void respringCallback(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
     sleep(1);
     exit(0);
 }
+
+// Khởi tạo Hook động và lắng nghe tín hiệu
 %ctor {
+    MSHookFunction((void *)dlsym(RTLD_DEFAULT, "MGCopyAnswer"), (void *)new_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, respringCallback, CFSTR("com.outcome.devicechanger.respring"), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
 }
