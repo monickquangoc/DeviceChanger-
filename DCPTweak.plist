@@ -8,6 +8,7 @@
         <array>
             <string>com.apple.springboard</string>
             <string>com.apple.UIKit</string>
+            <string>com.apple.Preferences</string>
             <string>com.bee.ios</string>
             <string>com.shopee.vn</string>
         </array>
