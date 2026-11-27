@@ -72,7 +72,12 @@ static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
 - (NSString *)systemVersion { NSString *val = getValue(@"version"); return val ?: %orig; }
 - (NSUUID *)identifierForVendor { NSString *val = getValue(@"idfv"); return val ? [[NSUUID alloc] initWithUUIDString:val] : %orig; }
 - (float)batteryLevel { NSNumber *val = getValue(@"battery"); return val ? [val floatValue] : %orig; }
-- (UIDeviceBatteryState)batteryState { NSNumber *val = getValue(@"batteryState"); return val ? [val integerValue] : %orig; }
+
+// SỬA LỖI TẠI ĐÂY: Thêm ép kiểu (UIDeviceBatteryState)
+- (UIDeviceBatteryState)batteryState { 
+    NSNumber *val = getValue(@"batteryState"); 
+    return val ? (UIDeviceBatteryState)[val integerValue] : %orig; 
+}
 %end
 
 // 5. IDFA
