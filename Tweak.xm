@@ -2,8 +2,8 @@
 #import <CoreLocation/CoreLocation.h>
 #import <AdSupport/AdSupport.h>
 #import <substrate.h>
+#import <dlfcn.h> // THÊM DÒNG NÀY ĐỂ FIX LỖI RTLD_DEFAULT
 
-// Dùng con trỏ hàm để gọi MGCopyAnswer mà không cần link thư viện
 typedef CFTypeRef (*MGCopyAnswerFunc)(CFStringRef);
 static MGCopyAnswerFunc orig_MGCopyAnswer = NULL;
 
@@ -21,7 +21,6 @@ static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
     return NULL;
 }
 
-// 1. Hook UIDevice (Cho các app khác đọc)
 %hook UIDevice
 - (NSString *)name {
     NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
@@ -45,7 +44,6 @@ static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
 }
 %end
 
-// 2. Hook IDFA
 %hook ASIdentifierManager
 - (NSUUID *)advertisingIdentifier {
     NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
@@ -54,7 +52,6 @@ static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
 }
 %end
 
-// 3. Hook Định vị
 %hook CLLocationManager
 - (CLLocation *)location {
     NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
@@ -75,7 +72,6 @@ static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
 }
 %end
 
-// 4. Bypass Jailbreak
 %hook NSFileManager
 - (BOOL)fileExistsAtPath:(NSString *)path {
     NSArray *jbPaths = @[@"/Applications/Cydia.app", @"/var/jb", @"/usr/sbin/sshd", @"/.installed_dopamine", @"/private/var/lib/dpkg"];
@@ -86,13 +82,11 @@ static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
 }
 %end
 
-// 5. Lắng nghe tín hiệu từ App để tự Respring
 static void respringCallback(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
     sleep(1);
     exit(0);
 }
 
-// Khởi tạo Hook động và lắng nghe tín hiệu
 %ctor {
     MSHookFunction((void *)dlsym(RTLD_DEFAULT, "MGCopyAnswer"), (void *)new_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, respringCallback, CFSTR("com.outcome.devicechanger.respring"), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
