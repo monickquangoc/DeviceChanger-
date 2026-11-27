@@ -10,7 +10,6 @@ extern char **environ;
     NSMutableDictionary *_currentConfig;
 }
 
-// Dùng chung suite name với Tweak để đồng bộ dữ liệu
 - (NSUserDefaults *)sharedDefaults {
     return [[NSUserDefaults alloc] initWithSuiteName:@"com.outcome.devicechangerpro"];
 }
@@ -40,12 +39,17 @@ extern char **environ;
     _currentConfig = [[defaults dictionaryRepresentation] mutableCopy];
 }
 
+- (void)runShell:(NSString *)cmd {
+    NSString *sh = @"/var/jb/usr/bin/sh"; 
+    pid_t pid;
+    const char *args[] = {[sh UTF8String], "-c", [cmd UTF8String], NULL};
+    posix_spawn(&pid, [sh UTF8String], NULL, NULL, (char * const *)args, environ);
+}
+
 - (void)respring {
-    // Gửi thông báo để Tweak tự khởi động lại (App không có quyền chạy killall)
+    [_currentConfig writeToFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist" atomically:YES];
+    // Xóa lệnh system(), chỉ dùng tín hiệu Tweak
     CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), CFSTR("com.outcome.devicechanger.respring"), NULL, NULL, YES);
-    
-    // Hỗ trợ thêm lệnh system cho chắc chắn
-    system("killall -9 SpringBoard");
 }
 
 - (NSString *)generateRandomSerial {
@@ -72,7 +76,6 @@ extern char **environ;
     
     [defaults synchronize];
     
-    // Bật thông báo để kiểm tra xem App có lưu được không
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Thành công" message:@"Đã Random thông số mới!\nBấm 'Lưu & Respring' để áp dụng." preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
@@ -81,11 +84,26 @@ extern char **environ;
     dispatch_async(dispatch_get_main_queue(), ^{ [self.tableView reloadData]; });
 }
 
+// Thêm lại hàm wipeData bị thiếu
+- (void)wipeData {
+    NSString *cmd = @"for dir in /var/mobile/Containers/Data/Application/*/; do "
+                     "if grep -q -E 'com.bee.ios|com.shopee.vn' \"$dir/.com.apple.mobile_container_manager.metadata.plist\" 2>/dev/null; then "
+                     "rm -rf \"$dir/Library/Caches/\"*; "
+                     "rm -rf \"$dir/Library/Preferences/\"*; "
+                     "rm -rf \"$dir/Documents/\"*; "
+                     "fi; done";
+    [self runShell:cmd];
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Wipe" message:@"Đã xóa sạch dữ liệu!" preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 #pragma mark - Table View
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 2; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) return 1;
+    if (section == 0) return 3;
     return 3;
 }
 
