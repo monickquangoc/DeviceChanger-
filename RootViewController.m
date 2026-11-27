@@ -17,6 +17,8 @@ extern char **environ;
     _plistPath = @"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist";
     [self loadConfig];
     
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Respring" style:UIBarButtonItemStyleDone target:self action:@selector(respring)];
+    
     // Lắng nghe lệnh tự động từ Lua (AutoTouch/XXTouch)
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(randomizeAction) name:@"AutoRandomize" object:nil];
 }
@@ -35,8 +37,8 @@ extern char **environ;
 }
 
 - (void)runShell:(NSString *)cmd {
-    // Hỗ trợ cả Rootless (palera1n) và Rootful
-    NSString *sh = [[NSFileManager defaultManager] fileExistsAtPath:@"/var/jb/usr/bin/sh"] ? @"/var/jb/usr/bin/sh" : @"/bin/sh";
+    // Đường dẫn cho môi trường Rootless (Dopamine/Palera1n)
+    NSString *sh = @"/var/jb/usr/bin/sh";
     pid_t pid;
     const char *args[] = {[sh UTF8String], "-c", [cmd UTF8String], NULL};
     posix_spawn(&pid, [sh UTF8String], NULL, NULL, (char * const *)args, environ);
@@ -50,7 +52,9 @@ extern char **environ;
 - (NSString *)generateRandomSerial {
     NSString *letters = @"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     NSMutableString *randomString = [NSMutableString stringWithCapacity:12];
-    for (int i = 0; i < 12; i++) [randomString appendFormat:@"%C", [letters characterAtIndex:arc4random_uniform((uint32_t)[letters length])]];
+    for (int i = 0; i < 12; i++) {
+        [randomString appendFormat:@"%C", [letters characterAtIndex:arc4random_uniform((uint32_t)[letters length])]];
+    }
     return randomString;
 }
 
@@ -71,31 +75,36 @@ extern char **environ;
 }
 
 - (void)wipeData {
-    // Xóa sạch mọi dấu vết của Shopee và các app khác
-    NSString *cmd = @"for dir in /var/mobile/Containers/Data/Application/*/; do \
-        if grep -q -E 'com.bee.ios|com.shopee.vn' \"$dir/.com.apple.mobile_container_manager.metadata.plist\" 2>/dev/null; then \
-            rm -rf \"$dir/Library/Caches/\"*; \
-            rm -rf \"$dir/Library/Preferences/\"*; \
-            rm -rf \"$dir/Documents/\"*; \
-        fi; done";
+    NSString *cmd = @"for dir in /var/mobile/Containers/Data/Application/*/; do "
+                     "if grep -q -E 'com.bee.ios|com.shopee.vn' \"$dir/.com.apple.mobile_container_manager.metadata.plist\" 2>/dev/null; then "
+                     "rm -rf \"$dir/Library/Caches/\"*; "
+                     "rm -rf \"$dir/Library/Preferences/\"*; "
+                     "rm -rf \"$dir/Documents/\"*; "
+                     "fi; done";
     [self runShell:cmd];
+    
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Wipe" message:@"Đã xóa sạch dữ liệu!" preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Table View
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 3; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { 
+    return 3; 
+}
+
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 1;
-    if (section == 1) return 4; // Random, Wipe, Backup, Respring
+    if (section == 1) return 4;
     return 2;
 }
+
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Trạng thái";
     if (section == 1) return @"Hành động";
     return @"Dữ liệu Fake";
 }
+
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
     cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
@@ -119,7 +128,11 @@ extern char **environ;
     }
     return cell;
 }
-- (void)switchChanged:(UISwitch *)sender { _currentConfig[@"Enabled"] = @(sender.isOn); }
+
+- (void)switchChanged:(UISwitch *)sender { 
+    _currentConfig[@"Enabled"] = @(sender.isOn); 
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     if (indexPath.section == 1) {
