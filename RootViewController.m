@@ -19,7 +19,6 @@ extern char **environ;
     
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Respring" style:UIBarButtonItemStyleDone target:self action:@selector(respring)];
     
-    // Lắng nghe lệnh tự động từ Lua (AutoTouch/XXTouch)
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(randomizeAction) name:@"AutoRandomize" object:nil];
 }
 
@@ -37,8 +36,8 @@ extern char **environ;
 }
 
 - (void)runShell:(NSString *)cmd {
-    // Đường dẫn cho môi trường Rootless (Dopamine/Palera1n)
-    NSString *sh = @"/var/jb/usr/bin/sh";
+    // Sử dụng shell của môi trường rootless (/var/jb)
+    NSString *sh = @"/var/jb/usr/bin/sh"; 
     pid_t pid;
     const char *args[] = {[sh UTF8String], "-c", [cmd UTF8String], NULL};
     posix_spawn(&pid, [sh UTF8String], NULL, NULL, (char * const *)args, environ);
@@ -46,7 +45,8 @@ extern char **environ;
 
 - (void)respring {
     [_currentConfig writeToFile:_plistPath atomically:YES];
-    [self runShell:@"killall -9 SpringBoard"];
+    // Gửi tín hiệu cho Tweak trong SpringBoard để nó tự khởi động lại
+    CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), CFSTR("com.outcome.devicechanger.respring"), NULL, NULL, YES);
 }
 
 - (NSString *)generateRandomSerial {
@@ -89,9 +89,7 @@ extern char **environ;
 }
 
 #pragma mark - Table View
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { 
-    return 3; 
-}
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 3; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 1;
