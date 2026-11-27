@@ -2,11 +2,27 @@
 #import <CoreLocation/CoreLocation.h>
 #import <AdSupport/AdSupport.h>
 
+extern CFTypeRef MGCopyAnswer(CFStringRef property);
+
 static NSDictionary *getConfig() {
     return [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
 }
 
-// 1. Hook Thông tin thiết bị
+// 1. Hook MobileGestalt (Để Settings -> About thay đổi)
+%hookf(CFTypeRef, MGCopyAnswer, CFStringRef prop) {
+    NSDictionary *cfg = getConfig();
+    if (cfg[@"Enabled"]) {
+        if (CFEqual(prop, CFSTR("ProductType"))) {
+            return (__bridge_retained CFTypeRef)cfg[@"model"];
+        }
+        if (CFEqual(prop, CFSTR("UserAssignedDeviceName"))) {
+            return (__bridge_retained CFTypeRef)cfg[@"name"];
+        }
+    }
+    return %orig;
+}
+
+// 2. Hook UIDevice (Cho các app khác đọc)
 %hook UIDevice
 - (NSString *)name {
     NSDictionary *cfg = getConfig();
@@ -30,7 +46,7 @@ static NSDictionary *getConfig() {
 }
 %end
 
-// 2. Hook IDFA
+// 3. Hook IDFA
 %hook ASIdentifierManager
 - (NSUUID *)advertisingIdentifier {
     NSDictionary *cfg = getConfig();
@@ -39,7 +55,7 @@ static NSDictionary *getConfig() {
 }
 %end
 
-// 3. Hook Định vị
+// 4. Hook Định vị (Fake Location)
 %hook CLLocationManager
 - (CLLocation *)location {
     NSDictionary *cfg = getConfig();
@@ -60,7 +76,7 @@ static NSDictionary *getConfig() {
 }
 %end
 
-// 4. Bypass Jailbreak (Ẩn dấu vết với Shopee)
+// 5. Bypass Jailbreak
 %hook NSFileManager
 - (BOOL)fileExistsAtPath:(NSString *)path {
     NSArray *jbPaths = @[@"/Applications/Cydia.app", @"/var/jb", @"/usr/sbin/sshd", @"/.installed_dopamine", @"/private/var/lib/dpkg"];
@@ -71,11 +87,11 @@ static NSDictionary *getConfig() {
 }
 %end
 
-// 5. Ẩn biến môi trường Inject
-%hook NSProcessInfo
-- (NSDictionary *)environment {
-    NSMutableDictionary *env = [%orig mutableCopy];
-    [env removeObjectForKey:@"DYLD_INSERT_LIBRARIES"];
-    return env;
+// 6. Lắng nghe tín hiệu từ App để tự Respring (Vì App không có quyền killall)
+static void respringCallback(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
+    sleep(1);
+    exit(0);
 }
-%end
+%ctor {
+    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, respringCallback, CFSTR("com.outcome.devicechanger.respring"), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
+}
