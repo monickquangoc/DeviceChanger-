@@ -3,21 +3,45 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: theos/theos:latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        
-      - name: Fix Git Safe Directory
-        run: git config --global --add safe.directory '*'
-        
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make git curl clang fakeroot dpkg xz-utils
+
+      - name: Setup Theos Toolchain
+        run: |
+          # Tải bộ biên dịch iOS (Clang Toolchain) chính thức của Theos
+          curl -L -o toolchain.tar.xz https://github.com/theos/toolchain/releases/latest/download/toolchain_linux_x64.tar.xz
+          tar -xJf toolchain.tar.xz -C $HOME
+          echo "$HOME/toolchain/linux/iphone/bin" >> $GITHUB_PATH
+
+      - name: Setup Theos
+        run: |
+          export THEOS=$HOME/theos
+          git clone --recursive https://github.com/theos/theos.git $THEOS
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+
+      - name: Download SDK
+        run: |
+          rm -rf $THEOS/sdks
+          git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks
+
+      - name: Download Ldid
+        run: |
+          curl -L -o ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64
+          chmod +x ldid
+          sudo mv ldid /usr/local/bin/
+
       - name: Build Package
         run: |
-          export THEOS=/opt/theos
+          export THEOS=$HOME/theos
           make clean || true
           make package FINALPACKAGE=1
-          
+
       - name: Upload Deb
         uses: actions/upload-artifact@v4
         with:
