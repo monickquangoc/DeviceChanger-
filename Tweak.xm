@@ -2,7 +2,8 @@
 #import <CoreLocation/CoreLocation.h>
 #import <AdSupport/AdSupport.h>
 
-extern CFTypeRef MGCopyAnswer(CFStringRef property);
+// Thêm extern "C" để sửa lỗi Undefined symbols (Name Mangling)
+extern "C" CFTypeRef MGCopyAnswer(CFStringRef property);
 
 static NSDictionary *getConfig() {
     return [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/Preferences/com.outcome.devicechangerpro.plist"];
