@@ -12,10 +12,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y make git curl fakeroot dpkg
           
-      - name: Setup Theos
+      - name: Setup Theos and SDK
         run: |
           export THEOS=$HOME/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
+          # Tải SDK iOS 15.6 về (dung lượng khoảng 400MB)
+          git clone --depth 1 https://github.com/theos/sdks.git /tmp/sdks
+          mkdir -p $THEOS/sdks
+          cp -r /tmp/sdks/iPhoneOS15.6.sdk $THEOS/sdks/
           
       - name: Build Package
         run: |
