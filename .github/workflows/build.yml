@@ -12,7 +12,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y make git curl fakeroot dpkg
           
-          # Tải trực tiếp ldid bản Linux, bỏ qua kho của Ubuntu
+          # Tải trực tiếp ldid bản Linux
           curl -L -o ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64
           chmod +x ldid
           sudo mv ldid /usr/local/bin/
@@ -25,6 +25,8 @@ jobs:
 
       - name: Download SDK
         run: |
+          # Xóa thư mục rỗng có sẵn trước khi tải SDK mới
+          rm -rf $THEOS/sdks
           git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks
 
       - name: Fix Permissions
