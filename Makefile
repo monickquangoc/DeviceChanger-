@@ -8,7 +8,6 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = DCPTweak
 DCPTweak_FILES = Tweak.xm
 DCPTweak_FRAMEWORKS = UIKit CoreLocation AdSupport
-DCPTweak_PRIVATE_FRAMEWORKS = MobileGestalt
 DCPTweak_CFLAGS = -fobjc-arc
 include $(THEOS_MAKE_PATH)/tweak.mk
 
