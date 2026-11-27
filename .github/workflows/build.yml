@@ -2,48 +2,20 @@ name: Build DeviceChanger Deb
 on: [push, workflow_dispatch]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
-        
-      - name: Install Dependencies
+
+      - name: Install Theos (Auto)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y make git curl xz-utils fakeroot dpkg
-        
-      - name: Install Theos & Toolchain
-        run: |
-          export THEOS=$HOME/theos
-          # Clone Theos
-          git clone --recursive https://github.com/theos/theos.git $THEOS
-          
-          # Tải Toolchain (Bộ biên dịch clang)
-          curl -L -O https://github.com/theos/toolchain/releases/download/linux-x64/toolchain_linux_x64.tar.xz
-          tar -xJf toolchain_linux_x64.tar.xz -C $HOME
-          
-          # Lưu biến môi trường cho các bước sau
-          echo "THEOS=$THEOS" >> $GITHUB_ENV
-          echo "$HOME/toolchain/linux/iphone/bin" >> $GITHUB_PATH
-          
-          # Tải ldid (Trình ký app)
-          curl -L -o ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_linux_x86_64
-          chmod +x ldid
-          sudo mv ldid /usr/local/bin/
-          
-      - name: Download SDK
-        run: |
-          export THEOS=$HOME/theos
-          rm -rf $THEOS/sdks
-          # Tải SDK iOS
-          git clone --depth 1 https://github.com/theos/sdks.git $THEOS/sdks
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
           
       - name: Build Package
         run: |
           export THEOS=$HOME/theos
-          # Fix lỗi Git
+          export PATH=$THEOS/bin:$PATH
           git config --global --add safe.directory '*'
-          # Bắt đầu build
           make clean || true
           make package FINALPACKAGE=1
           
