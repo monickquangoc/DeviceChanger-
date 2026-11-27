@@ -36,22 +36,10 @@ static CFTypeRef new_MGCopyAnswer(CFStringRef prop) {
 static CFTypeRef new_IORegistryEntryCreateCFProperty(io_registry_entry_t entry, CFStringRef key, CFAllocatorRef allocator, IOOptionBits options) {
     NSDictionary *cfg = getCfg();
     if (cfg[@"Enabled"]) {
-        // Fake Serial Number phần cứng
-        if (CFEqual(key, CFSTR("IOPlatformSerialNumber"))) {
-            return (__bridge_retained CFTypeRef)cfg[@"serial"];
-        }
-        // Fake Hardware UUID
-        if (CFEqual(key, CFSTR("IOPlatformUUID"))) {
-            return (__bridge_retained CFTypeRef)cfg[@"idfv"];
-        }
-        // Fake Target Type (Dòng máy)
-        if (CFEqual(key, CFSTR("target-type"))) {
-            return (__bridge_retained CFTypeRef)cfg[@"model"];
-        }
-        // Fake Tên máy
-        if (CFEqual(key, CFSTR("USBProductName"))) {
-            return (__bridge_retained CFTypeRef)cfg[@"name"];
-        }
+        if (CFEqual(key, CFSTR("IOPlatformSerialNumber"))) return (__bridge_retained CFTypeRef)cfg[@"serial"];
+        if (CFEqual(key, CFSTR("IOPlatformUUID"))) return (__bridge_retained CFTypeRef)cfg[@"idfv"];
+        if (CFEqual(key, CFSTR("target-type"))) return (__bridge_retained CFTypeRef)cfg[@"model"];
+        if (CFEqual(key, CFSTR("USBProductName"))) return (__bridge_retained CFTypeRef)cfg[@"name"];
     }
     if (orig_IORegistryEntryCreateCFProperty) {
         return orig_IORegistryEntryCreateCFProperty(entry, key, allocator, options);
@@ -75,11 +63,13 @@ static CFTypeRef new_IORegistryEntryCreateCFProperty(io_registry_entry_t entry, 
     if (cfg[@"Enabled"] && oldp) {
         if (strcmp(name, "hw.model") == 0 || strcmp(name, "hw.machine") == 0) {
             const char *val = [cfg[@"model"] UTF8String];
-            if (oldlenp && *oldlenp >= strlen(val) + 1) { strcpy(oldp, val); return 0; }
+            // SỬA LỖI TẠI ĐÂY: Thêm (char *) vào trước oldp
+            if (oldlenp && *oldlenp >= strlen(val) + 1) { strcpy((char *)oldp, val); return 0; }
         }
         if (strcmp(name, "kern.osversion") == 0) {
             const char *val = [cfg[@"version"] UTF8String];
-            if (oldlenp && *oldlenp >= strlen(val) + 1) { strcpy(oldp, val); return 0; }
+            // SỬA LỖI TẠI ĐÂY: Thêm (char *) vào trước oldp
+            if (oldlenp && *oldlenp >= strlen(val) + 1) { strcpy((char *)oldp, val); return 0; }
         }
     }
     return %orig;
