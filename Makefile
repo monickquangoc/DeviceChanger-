@@ -1,7 +1,5 @@
 ARCHS = arm64 arm64e
 TARGET = iphone:clang:latest:15.0
-# Mặc định build Rootless (palera1n rootless). Nếu dùng palera1n rootful, xóa dòng dưới đi.
-THEOS_PACKAGE_SCHEME = rootless
 
 include $(THEOS)/makefiles/common.mk
 
